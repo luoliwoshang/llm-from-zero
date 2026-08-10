@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>词向量 3D · 人称 × 动物 × 性别</title>
+<style>
+  :root {
+    --bg: #080b14;
+    --panel: rgba(13, 18, 34, 0.78);
+    --panel-edge: rgba(120, 140, 200, 0.18);
+    --ink: #e8ecff;
+    --ink-dim: #8b93b8;
+    --ink-faint: #5a6184;
+    --x: #ff5d5d;
+    --y: #4ade80;
+    --z: #60a5fa;
+    --s1: #fbbf24;
+    --s2: #22d3ee;
+    --shared: #c084fc;
+    --mono: "SFMono-Regular", ui-monospace, "Menlo", "Consolas", monospace;
+    --sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body { height: 100%; overflow: hidden; background: var(--bg); }
+
+  body {
+    font-family: var(--sans);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    background:
+      radial-gradient(1200px 800px at 78% -10%, rgba(64, 90, 220, 0.18), transparent 60%),
+      radial-gradient(900px 700px at -10% 110%, rgba(192, 132, 252, 0.10), transparent 55%),
+      var(--bg);
+  }
+
+  #app { position: fixed; inset: 0; }
+  #app canvas { display: block; }
+  #labels { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    position: fixed; top: 18px; left: 20px; z-index: 20;
+    display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+  }
+  .title {
+    font-size: 26px; font-weight: 800; letter-spacing: 1px; line-height: 1.15;
+    text-shadow: 0 2px 24px rgba(90, 120, 255, 0.35);
+  }
+  .title .accent { color: transparent; background: linear-gradient(90deg, #ff5d5d, #fbbf24 40%, #22d3ee 75%, #60a5fa); -webkit-background-clip: text; background-clip: text; }
+  .subtitle { font-size: 13px; color: var(--ink-dim); max-width: 420px; line-height: 1.6; }
+  .sent-chips { display: flex; gap: 10px; flex-wrap: wrap; }
+  .sent-chip {
+    pointer-events: auto; cursor: pointer;
+    font-size: 13px; padding: 7px 14px; border-radius: 10px;
+    border: 1px solid var(--panel-edge);
+    background: var(--panel); backdrop-filter: blur(10px);
+    color: var(--ink); transition: transform .15s ease, box-shadow .2s ease, border-color .2s ease;
+    user-select: none;
+  }
+  .sent-chip:hover { transform: translateY(-1px); }
+  .sent-chip .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; }
+  .sent-chip.active { border-color: var(--chip-c, var(--ink-dim)); box-shadow: 0 0 0 1px var(--chip-c, transparent), 0 6px 20px -8px var(--chip-c, transparent); }
+  .sent-chip .badge { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); margin-left: 6px; }
+
+  /* ---------- right token panel ---------- */
+  .panel {
+    position: fixed; top: 18px; right: 18px; z-index: 20;
+    width: 292px; max-height: calc(100vh - 36px); overflow-y: auto;
+    background: var(--panel); backdrop-filter: blur(14px);
+    border: 1px solid var(--panel-edge); border-radius: 16px;
+    padding: 16px 16px 12px;
+    box-shadow: 0 20px 50px -20px rgba(0,0,0,0.7);
+  }
+  .panel::-webkit-scrollbar { width: 6px; }
+  .panel::-webkit-scrollbar-thumb { background: rgba(120,140,200,0.25); border-radius: 3px; }
+  .panel h2 { font-size: 12px; font-weight: 700; letter-spacing: 3px; color: var(--ink-faint); margin-bottom: 12px; }
+
+  .tok-group { margin-bottom: 14px; }
+  .tok-group .shead { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; font-weight: 700; }
+  .tok-group .shead .bar { width: 14px; height: 4px; border-radius: 2px; }
+  .tok-group .shead .snum { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); }
+
+  .tok-item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 7px 9px; margin-bottom: 4px; border-radius: 10px;
+    cursor: pointer; border: 1px solid transparent; user-select: none;
+    transition: background .15s ease, border-color .15s ease, transform .12s ease;
+  }
+  .tok-item:hover { background: rgba(255,255,255,0.05); transform: translateX(2px); }
+  .tok-item.selected { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.22); }
+  .tok-item .ball { width: 11px; height: 11px; border-radius: 50%; flex: none; box-shadow: 0 0 10px currentColor; }
+  .tok-item .word { font-size: 15px; font-weight: 600; }
+  .tok-item .vec { font-family: var(--mono); font-size: 10.5px; color: var(--ink-dim); margin-left: auto; white-space: nowrap; }
+  .tok-item .vec b:nth-child(1) { color: var(--x); }
+  .tok-item .vec b:nth-child(2) { color: var(--y); }
+  .tok-item .vec b:nth-child(3) { color: var(--z); }
+
+  .legend-mini { display: flex; gap: 12px; margin-top: 8px; padding-top: 10px; border-top: 1px dashed rgba(120,140,200,0.2); font-size: 11px; color: var(--ink-dim); flex-wrap: wrap; }
+  .legend-mini span i { font-style: normal; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+
+  /* ---------- detail card ---------- */
+  .detail {
+    position: fixed; left: 20px; bottom: 20px; z-index: 20;
+    width: 340px; max-width: calc(100vw - 40px);
+    background: var(--panel); backdrop-filter: blur(14px);
+    border: 1px solid var(--panel-edge); border-radius: 16px;
+    padding: 16px; box-shadow: 0 20px 50px -20px rgba(0,0,0,0.7);
+    opacity: 0; transform: translateY(12px); pointer-events: none;
+    transition: opacity .25s ease, transform .25s ease;
+  }
+  .detail.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  .detail .d-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+  .detail .d-word { font-size: 24px; font-weight: 800; }
+  .detail .d-meta { font-size: 11px; color: var(--ink-faint); font-family: var(--mono); }
+  .detail .d-vec { display: flex; gap: 8px; margin: 10px 0; }
+  .detail .d-vec .cell {
+    flex: 1; text-align: center; padding: 8px 4px; border-radius: 10px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(120,140,200,0.14);
+  }
+  .detail .d-vec .cell .v { font-family: var(--mono); font-size: 17px; font-weight: 700; }
+  .detail .d-vec .cell .k { font-size: 11px; color: var(--ink-dim); margin-top: 2px; }
+  .detail .d-vec .cell.x .v { color: var(--x); } .detail .d-vec .cell.x .k { color: var(--x); }
+  .detail .d-vec .cell.y .v { color: var(--y); } .detail .d-vec .cell.y .k { color: var(--y); }
+  .detail .d-vec .cell.z .v { color: var(--z); } .detail .d-vec .cell.z .k { color: var(--z); }
+  .detail .d-reason { font-size: 12.5px; line-height: 1.75; color: var(--ink-dim); }
+  .detail .d-note { margin-top: 10px; font-size: 12px; line-height: 1.7; color: var(--shared); background: rgba(192,132,252,0.10); border: 1px dashed rgba(192,132,252,0.35); border-radius: 10px; padding: 8px 10px; }
+  .detail .d-note.neutral { color: var(--ink); background: rgba(255,255,255,0.05); border-color: rgba(120,140,200,0.25); }
+  .detail .d-close { position: absolute; top: 10px; right: 12px; cursor: pointer; color: var(--ink-faint); font-size: 16px; padding: 2px 6px; border-radius: 6px; }
+  .detail .d-close:hover { color: var(--ink); background: rgba(255,255,255,0.08); }
+
+  /* ---------- bottom toolbar ---------- */
+  .toolbar {
+    position: fixed; bottom: 20px; right: 18px; z-index: 20;
+    display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;
+    max-width: 70vw;
+  }
+  .tbtn {
+    pointer-events: auto; cursor: pointer;
+    font-size: 12px; padding: 7px 12px; border-radius: 999px;
+    border: 1px solid var(--panel-edge); background: var(--panel); backdrop-filter: blur(10px);
+    color: var(--ink-dim); transition: all .15s ease; user-select: none; white-space: nowrap;
+  }
+  .tbtn:hover { color: var(--ink); border-color: rgba(255,255,255,0.3); }
+  .tbtn.on { color: var(--ink); background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.35); box-shadow: 0 0 14px -4px rgba(255,255,255,0.4); }
+
+  .hint {
+    position: fixed; left: 20px; bottom: 20px; z-index: 5; pointer-events: none;
+    font-size: 12px; color: var(--ink-faint); line-height: 1.8; transition: opacity .3s ease;
+  }
+  .hint.hidden { opacity: 0; }
+
+  /* ---------- 3D css2d labels ---------- */
+  .tok-label {
+    pointer-events: auto; cursor: pointer; text-align: center;
+    background: rgba(8,11,20,0.82); border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 9px; padding: 4px 9px; backdrop-filter: blur(6px);
+    transform: translate(-50%, -50%);
+    transition: transform .12s ease, border-color .15s ease, box-shadow .15s ease;
+    white-space: nowrap;
+  }
+  .tok-label:hover { transform: translate(-50%, -50%) scale(1.08); border-color: rgba(255,255,255,0.5); }
+  .tok-label.selected { border-color: rgba(255,255,255,0.85); box-shadow: 0 0 18px -2px rgba(255,255,255,0.5); }
+  .tok-label .w { display: block; font-size: 14px; font-weight: 700; line-height: 1.2; }
+  .tok-label .v { display: block; font-family: var(--mono); font-size: 9.5px; color: var(--ink-dim); line-height: 1.3; }
+  .axis-label {
+    pointer-events: none; text-align: center; white-space: nowrap;
+    transform: translate(-50%, -50%);
+    font-size: 14px; font-weight: 800; letter-spacing: 2px;
+    text-shadow: 0 0 18px currentColor, 0 2px 10px rgba(0,0,0,0.9);
+  }
+  .axis-label small { display: block; font-size: 10px; font-weight: 600; letter-spacing: 1px; opacity: 0.75; }
+
+  .fade-in { animation: fadeUp .7s ease both; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<div class="topbar fade-in">
+  <div class="title">词向量 <span class="accent">3D</span> 可视化</div>
+  <div class="subtitle">
+    每个词用 <b style="color:var(--x)">人称 X</b> × <b style="color:var(--y)">动物 Y</b> × <b style="color:var(--z)">性别 Z</b>
+    三个维度定位在三维空间里——空间距离 ≈ 词义的接近程度。<br/>
+    拖动旋转、滚轮缩放，<b>点击任意球体</b>查看它的向量与理由。
+  </div>
+  <div class="sent-chips">
+    <div class="sent-chip" id="chip-s1" style="--chip-c:var(--s1)"><span class="dot" style="background:var(--s1)"></span>句子 1 · 你是一个胖宝宝<span class="badge">5 tokens</span></div>
+    <div class="sent-chip" id="chip-s2" style="--chip-c:var(--s2)"><span class="dot" style="background:var(--s2)"></span>句子 2 · 我好喜欢你<span class="badge">4 tokens</span></div>
+    <div class="sent-chip active" id="chip-all" style="--chip-c:var(--ink-dim)"><span class="dot" style="background:linear-gradient(90deg,var(--s1),var(--s2))"></span>全部<span class="badge">看全貌</span></div>
+  </div>
+</div>
+
+<div class="panel fade-in" style="animation-delay:.1s">
+  <h2>TOKENS · 词与向量</h2>
+
+  <div class="tok-group">
+    <div class="shead"><span class="bar" style="background:var(--s1)"></span>句子 1<span class="snum">你是一个胖宝宝</span></div>
+    <div class="tok-item" data-tok="你"><span class="ball" style="color:var(--shared); background:var(--shared)"></span><span class="word">你</span><span class="vec"><b>1.0</b> <b>0.0</b> <b>0.0</b></span></div>
+    <div class="tok-item" data-tok="是"><span class="ball" style="color:var(--s1); background:var(--s1)"></span><span class="word">是</span><span class="vec"><b>0.0</b> <b>0.0</b> <b>0.0</b></span></div>
+    <div class="tok-item" data-tok="一个"><span class="ball" style="color:var(--s1); background:var(--s1)"></span><span class="word">一个</span><span class="vec"><b>0.0</b> <b>0.0</b> <b>0.0</b></span></div>
+    <div class="tok-item" data-tok="胖"><span class="ball" style="color:var(--s1); background:var(--s1)"></span><span class="word">胖</span><span class="vec"><b>0.5</b> <b>0.5</b> <b>0.0</b></span></div>
+    <div class="tok-item" data-tok="宝宝"><span class="ball" style="color:var(--s1); background:var(--s1)"></span><span class="word">宝宝</span><span class="vec"><b>0.9</b> <b>0.1</b> <b>0.0</b></span></div>
+  </div>
+
+  <div class="tok-group">
+    <div class="shead"><span class="bar" style="background:var(--s2)"></span>句子 2<span class="snum">我好喜欢你</span></div>
+    <div class="tok-item" data-tok="我"><span class="ball" style="color:var(--s2); background:var(--s2)"></span><span class="word">我</span><span class="vec"><b>1.0</b> <b>0.0</b> <b>0.0</b></span></div>
+    <div class="tok-item" data-tok="好"><span class="ball" style="color:var(--s2); background:var(--s2)"></span><span class="word">好</span><span class="vec"><b>0.0</b> <b>0.0</b> <b>0.0</b></span></div>
+    <div class="tok-item" data-tok="喜欢"><span class="ball" style="color:var(--s2); background:var(--s2)"></span><span class="word">喜欢</span><span class="vec"><b>0.7</b> <b>0.3</b> <b>0.0</b></span></div>
+    <div class="tok-item" data-tok="你"><span class="ball" style="color:var(--shared); background:var(--shared)"></span><span class="word">你</span><span class="vec"><b>1.0</b> <b>0.0</b> <b>0.0</b></span></div>
+  </div>
+
+  <div class="legend-mini">
+    <span><i style="background:var(--x)"></i>人称 X</span>
+    <span><i style="background:var(--y)"></i>动物 Y</span>
+    <span><i style="background:var(--z)"></i>性别 Z</span>
+    <span><i style="background:var(--shared)"></i>你 = 两句共享</span>
+  </div>
+</div>
+
+<div class="detail" id="detail">
+  <div class="d-close" id="dclose">✕</div>
+  <div class="d-head">
+    <span class="d-word" id="d-word">—</span>
+    <span class="d-meta" id="d-meta"></span>
+  </div>
+  <div class="d-vec">
+    <div class="cell x"><div class="v" id="d-vx">0</div><div class="k">人称</div></div>
+    <div class="cell y"><div class="v" id="d-vy">0</div><div class="k">动物</div></div>
+    <div class="cell z"><div class="v" id="d-vz">0</div><div class="k">性别</div></div>
+  </div>
+  <div class="d-reason" id="d-reason"></div>
+  <div class="d-note" id="d-note"></div>
+</div>
+
+<div class="hint" id="hint">点击球体查看向量与理由 · 双击空白处取消选择</div>
+
+<div class="toolbar fade-in" style="animation-delay:.2s">
+  <div class="tbtn on" id="tb-rotate">旋转</div>
+  <div class="tbtn on" id="tb-links">关系连线</div>
+  <div class="tbtn on" id="tb-plane">Z=0 平面</div>
+  <div class="tbtn" id="tb-proj">投影线</div>
+  <div class="tbtn" id="tb-stars">星空</div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+const S = 3; // world units per vector unit
+
+/* ============================================================ 数据 */
+const AXES = [
+  { key:'X', name:'人称', axis:new THREE.Vector3(1,0,0), color:0xff5d5d, css:'var(--x)',
+    tip:'这个词多「像人」？1=一定是人，0=与人无关', range:'0 → 1' },
+  { key:'Y', name:'动物', axis:new THREE.Vector3(0,1,0), color:0x4ade80, css:'var(--y)',
+    tip:'这个词与动物多相关？1=是动物，0=无关', range:'0 → 1' },
+  { key:'Z', name:'性别', axis:new THREE.Vector3(0,0,1), color:0x60a5fa, css:'var(--z)',
+    tip:'0=中性；正向偏女性化，负向偏男性化', range:'-1 → 1' },
+];
+
+const SHARED_NOTE = '「你」同时出现在两句话里，是两句的共同锚点 —— 有人对你说你是胖宝宝，而你喜欢的人其实是你。';
+
+const SENTENCES = [
+  {
+    id: 1, text: '你是一个胖宝宝', color: 0xfbbf24, css: 'var(--s1)',
+    tokens: [
+      { text:'你', v:[1,0,0], shared:true, disp:[0,0,0],
+        reason:'第二人称代词，一定指代一个「人」；性别未指明 → 中性。' },
+      { text:'是', v:[0,0,0], disp:[-0.18,0,0.10],
+        reason:'系动词，只负责语法结构，没有「人称/动物/性别」语义，落在原点。' },
+      { text:'一个', v:[0,0,0], disp:[0,0,0.20],
+        reason:'数量词，纯语法功能词，同样落在原点。' },
+      { text:'胖', v:[0.5,0.5,0], disp:[0,0,0],
+        reason:'既能形容人（胖宝宝）也能形容动物（胖猫）→ 人称、动物各占一半，在对角线上。' },
+      { text:'宝宝', v:[0.9,0.1,0], disp:[0,0,0],
+        reason:'主要指人类婴儿（人称极高）；但也是爱称，也用于「动物宝宝」，带少量动物性。' },
+    ],
+    relations: [
+      { from:'你', to:'宝宝', label:'「是」字连接 → 你 ＝ 胖宝宝', color: 0xfbbf24 },
+      { from:'胖', to:'宝宝', label:'修饰关系 → 「胖」描述「宝宝」', color: 0xfbbf24 },
+    ],
+  },
+  {
+    id: 2, text: '我好喜欢你', color: 0x22d3ee, css: 'var(--s2)',
+    tokens: [
+      { text:'我', v:[1,0,0], disp:[0,0,0],
+        reason:'第一人称代词，指说话者本人，一定是「人」；性别未知 → 中性。' },
+      { text:'好', v:[0,0,0], disp:[0.18,0,0.10],
+        reason:'程度副词（=非常），语法功能词，落在原点。' },
+      { text:'喜欢', v:[0.7,0.3,0], disp:[0,0,0],
+        reason:'主要是「人」发出的情感（我喜欢你）；但动物也有喜好（猫喜欢鱼）→ 偏人称、带少量动物性。' },
+    ],
+    relations: [
+      { from:'我', to:'喜欢', label:'施事 → 「我」发出动作「喜欢」', color: 0x22d3ee },
+      { from:'喜欢', to:'你', label:'受事 → 动作「喜欢」指向「你」', color: 0x22d3ee },
+    ],
+  },
+];
+
+const TOK_TEXT_TO_OBJ = new Map();
+let spheres = [];
+
+/* ============================================================ 基础场景 */
+const container = document.getElementById('app');
+const W = window.innerWidth, H = window.innerHeight;
+
+const scene = new THREE.Scene();
+scene.background = null; // 透明，让 CSS 背景透出
+
+const camera = new THREE.PerspectiveCamera(46, W/H, 0.1, 200);
+camera.position.set(9.5, 6.5, 10.5);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+renderer.setSize(W, H);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+container.appendChild(renderer.domElement);
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(W, H);
+labelRenderer.domElement.style.position = 'absolute';
+labelRenderer.domElement.style.top = '0';
+labelRenderer.domElement.style.left = '0';
+labelRenderer.domElement.style.pointerEvents = 'none';
+container.appendChild(labelRenderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 3;
+controls.maxDistance = 40;
+controls.target.set(1.4, 0.7, 0);
+controls.autoRotate = true;
+controls.autoRotateSpeed = 1.1;
+
+/* ---------- 灯光 ---------- */
+scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(6, 10, 8);
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0x88a0ff, 0.5);
+fill.position.set(-6, -2, -6);
+scene.add(fill);
+
+/* ---------- 星空 ---------- */
+const stars = new THREE.Points(
+  new THREE.BufferGeometry(),
+  new THREE.PointsMaterial({ color:0x9db4ff, size:0.035, transparent:true, opacity:0.7, sizeAttenuation:true })
+);
+{
+  const n = 900, arr = new Float32Array(n*3);
+  for (let i=0;i<n;i++){
+    const r = 30 + Math.random()*40;
+    const t = Math.random()*Math.PI*2;
+    const p = Math.acos(2*Math.random()-1);
+    arr[i*3]   = r*Math.sin(p)*Math.cos(t);
+    arr[i*3+1] = r*Math.cos(p);
+    arr[i*3+2] = r*Math.sin(p)*Math.sin(t);
+  }
+  stars.geometry.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+  scene.add(stars);
+}
+
+/* ---------- 网格 ---------- */
+const gridFloor = new THREE.GridHelper(12, 24, 0x2c3a66, 0x1a2340);
+gridFloor.position.y = -0.02;
+scene.add(gridFloor);
+const gridYZ = new THREE.GridHelper(12, 24, 0x2c3a66, 0x1a2340);
+gridYZ.rotation.x = Math.PI/2;
+gridYZ.position.z = -0.02;
+scene.add(gridYZ);
+
+/* ---------- 坐标轴 ---------- */
+function makeAxisLabel(text, small, css) {
+  const el = document.createElement('div');
+  el.className = 'axis-label';
+  el.style.color = css;
+  el.innerHTML = `${text}<small>${small}</small>`;
+  return el;
+}
+const axisLen = 4.1;
+AXES.forEach(a => {
+  const dir = a.axis.clone().normalize();
+  const arrow = new THREE.ArrowHelper(dir, new THREE.Vector3(0,0,0), axisLen, a.color, 0.34, 0.18);
+  scene.add(arrow);
+  const label = new CSS2DObject(makeAxisLabel(a.name, a.range, a.css));
+  label.position.copy(a.axis.clone().multiplyScalar(axisLen + 0.35));
+  scene.add(label);
+});
+
+/* Z=0 半透明平面 */
+const planeMat = new THREE.MeshBasicMaterial({ color:0x60a5fa, transparent:true, opacity:0.07, side:THREE.DoubleSide, depthWrite:false });
+const planeGeom = new THREE.PlaneGeometry(8.6, 8.6);
+const zPlane = new THREE.Mesh(planeGeom, planeMat);
+zPlane.rotation.x = -Math.PI/2;
+scene.add(zPlane);
+const planeEdge = new THREE.LineSegments(
+  new THREE.EdgesGeometry(planeGeom),
+  new THREE.LineBasicMaterial({ color:0x60a5fa, transparent:true, opacity:0.22 })
+);
+planeEdge.rotation.x = -Math.PI/2;
+scene.add(planeEdge);
+
+/* ============================================================ Token 球体 */
+function posOf(tok) {
+  return new THREE.Vector3(tok.v[0]*S, tok.v[1]*S, tok.v[2]*S)
+    .add(new THREE.Vector3(tok.disp[0], tok.disp[1], tok.disp[2]));
+}
+
+function makeTokLabel(tok) {
+  const el = document.createElement('div');
+  el.className = 'tok-label';
+  el.innerHTML = `<span class="w">${tok.text}</span><span class="v">(${tok.v.map(x=>x.toFixed(1)).join(', ')})</span>`;
+  el.style.color = tok.colorCss;
+  return el;
+}
+
+function addToken(tok) {
+  const pos = posOf(tok);
+  const color = tok.shared ? 0xc084fc : tok.sentence.color;
+  const mat = new THREE.MeshStandardMaterial({
+    color, roughness: 0.35, metalness: 0.15,
+    emissive: color, emissiveIntensity: 0.28,
+  });
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.16, 40, 40), mat);
+  mesh.position.copy(pos);
+  mesh.userData.tok = tok;
+  scene.add(mesh);
+  spheres.push(mesh);
+
+  const label = new CSS2DObject(makeTokLabel(tok));
+  label.position.copy(pos).add(new THREE.Vector3(0, 0.42, 0));
+  scene.add(label);
+
+  TOK_TEXT_TO_OBJ.set(tok.text, mesh);
+}
+
+// 共享「你」只渲染一次
+const sharedYou = { text:'你', v:[1,0,0], shared:true, disp:[0,0.02,0.10],
+  reason:'第二人称代词，一定指代一个「人」；性别未指明 → 中性。',
+  note: SHARED_NOTE };
+sharedYou.colorCss = 'var(--shared)';
+sharedYou.sentence = { color: 0xc084fc };
+addToken(sharedYou);
+
+SENTENCES.forEach(s => {
+  s.tokens.forEach(t => {
+    if (t.text === '你') return; // 共享
+    t.sentence = s;
+    t.colorCss = s.css;
+    addToken(t);
+  });
+});
+
+/* 关系连线 + 巡游粒子 */
+const linkGroup = new THREE.Group();
+scene.add(linkGroup);
+const travelerGroup = new THREE.Group();
+scene.add(travelerGroup);
+
+const linkLines = [];
+const travelers = [];
+
+function addLink(rel) {
+  const a = TOK_TEXT_TO_OBJ.get(rel.from).position;
+  const b = TOK_TEXT_TO_OBJ.get(rel.to).position;
+  const geo = new THREE.BufferGeometry().setFromPoints([a, b]);
+  const mat = new THREE.LineDashedMaterial({
+    color: rel.color, dashSize:0.18, gapSize:0.12, transparent:true, opacity:0.85,
+  });
+  const line = new THREE.Line(geo, mat);
+  line.computeLineDistances();
+  line.userData.rel = rel;
+  linkGroup.add(line);
+  linkLines.push(line);
+
+  const glow = new THREE.Mesh(
+    new THREE.SphereGeometry(0.07, 20, 20),
+    new THREE.MeshBasicMaterial({ color: rel.color, transparent:true, opacity:0.95 })
+  );
+  glow.userData = { from:a, to:b };
+  travelerGroup.add(glow);
+  travelers.push(glow);
+}
+
+SENTENCES.forEach(s => s.relations.forEach(addLink));
+
+/* ============================================================ 交互 */
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+const projLines = [];
+let selectedTok = null;
+let focusMode = 'all';
+
+function clearProj() { projLines.forEach(o => scene.remove(o)); projLines.length = 0; }
+
+function buildProj(pos) {
+  clearProj();
+  const opts = [
+    { end:new THREE.Vector3(pos.x,0,0), color:0xff5d5d },
+    { end:new THREE.Vector3(0,pos.y,0), color:0x4ade80 },
+    { end:new THREE.Vector3(0,0,pos.z), color:0x60a5fa },
+  ];
+  opts.forEach(o => {
+    const pts = [pos, o.end];
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineDashedMaterial({ color:o.color, dashSize:0.1, gapSize:0.08, transparent:true, opacity:0.55 });
+    const line = new THREE.Line(geo, mat);
+    line.computeLineDistances();
+    scene.add(line);
+    projLines.push(line);
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 12),
+      new THREE.MeshBasicMaterial({ color:o.color }));
+    dot.position.copy(o.end);
+    scene.add(dot);
+    projLines.push(dot);
+  });
+}
+
+const detail = document.getElementById('detail');
+const hintEl = document.getElementById('hint');
+
+function selectTok(tok) {
+  selectedTok = tok;
+  const mesh = TOK_TEXT_TO_OBJ.get(tok.text);
+  const sentence = tok.sentence;
+
+  // 高亮
+  spheres.forEach(s => s.material.emissiveIntensity = (s.userData.tok === tok) ? 0.75 : 0.28);
+  document.querySelectorAll('.tok-label.selected').forEach(e => e.classList.remove('selected'));
+  document.querySelectorAll('.tok-item.selected').forEach(e => e.classList.remove('selected'));
+
+  mesh && mesh.geometry.computeBoundingSphere();
+  // 更新面板
+  document.querySelectorAll('.tok-item').forEach(item => {
+    if (item.dataset.tok === tok.text) item.classList.add('selected');
+  });
+
+  document.getElementById('d-word').textContent = tok.text;
+  document.getElementById('d-meta').textContent =
+    sentence ? `句子 ${sentence.id} · ${sentence.text}` : '句子 1 ∩ 句子 2 · 共享';
+  document.getElementById('d-vx').textContent = tok.v[0].toFixed(1);
+  document.getElementById('d-vy').textContent = tok.v[1].toFixed(1);
+  document.getElementById('d-vz').textContent = tok.v[2].toFixed(1);
+  document.getElementById('d-reason').textContent = tok.reason;
+  const note = document.getElementById('d-note');
+  if (tok.note) {
+    note.textContent = tok.note;
+    note.className = 'd-note';
+  } else {
+    note.className = 'd-note neutral';
+    note.textContent = `位置：(${tok.v[0].toFixed(1)}, ${tok.v[1].toFixed(1)}, ${tok.v[2].toFixed(1)}) × 3 单位 → 实心世界坐标 (${(tok.v[0]*S).toFixed(1)}, ${(tok.v[1]*S).toFixed(1)}, ${(tok.v[2]*S).toFixed(1)})`;
+  }
+  detail.classList.add('show');
+  hintEl.classList.add('hidden');
+
+  if (document.getElementById('tb-proj').classList.contains('on')) buildProj(posOf(tok));
+
+  // 镜头聚焦
+  controls.target.copy(posOf(tok));
+  focusMode = null;
+}
+
+function clearSelection() {
+  selectedTok = null;
+  spheres.forEach(s => s.material.emissiveIntensity = 0.28);
+  document.querySelectorAll('.tok-label.selected').forEach(e => e.classList.remove('selected'));
+  document.querySelectorAll('.tok-item.selected').forEach(e => e.classList.remove('selected'));
+  detail.classList.remove('show');
+  clearProj();
+  hintEl.classList.remove('hidden');
+  focusSentences('all');
+}
+
+function onPick(e) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((e.clientX - rect.left)/rect.width)*2 - 1;
+  pointer.y = -((e.clientY - rect.top)/rect.height)*2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(spheres, false);
+  if (hits.length) {
+    selectTok(hits[0].object.userData.tok);
+  } else if (e.detail >= 2) {
+    clearSelection();
+  }
+}
+renderer.domElement.addEventListener('click', onPick);
+
+document.getElementById('dclose').addEventListener('click', clearSelection);
+
+// 面板 item 点击
+document.querySelectorAll('.tok-item').forEach(item => {
+  item.addEventListener('click', () => {
+    const mesh = TOK_TEXT_TO_OBJ.get(item.dataset.tok);
+    selectTok(mesh.userData.tok);
+  });
+});
+
+/* ============================================================ 镜头聚焦 */
+function focusSentences(mode) {
+  focusMode = mode;
+  const targets = {
+    'all': new THREE.Vector3(1.4, 0.7, 0),
+    's1': new THREE.Vector3(1.5, 0.55, 0),
+    's2': new THREE.Vector3(1.7, 0.45, 0),
+  };
+  if (mode !== 'all') {
+    // 拉近
+    const t = targets[mode];
+    controls.target.copy(t);
+    // 淡出另一句的球体？
+    SENTENCES.forEach(s => {
+      const active = (mode === 's' + s.id);
+      s.tokens.forEach(tok => {
+        const m = TOK_TEXT_TO_OBJ.get(tok.text);
+        if (!m) return;
+        const base = tok.shared ? 0.75 : (active ? 1 : 0.12);
+        m.material.transparent = true;
+        m.material.opacity = base;
+        m.visible = base > 0.05;
+      });
+    });
+  } else {
+    SENTENCES.forEach(s => s.tokens.forEach(tok => {
+      const m = TOK_TEXT_TO_OBJ.get(tok.text);
+      if (!m) return;
+      m.material.opacity = 1;
+      m.visible = true;
+    }));
+  }
+  requestAnimationFrame(() => {
+    const t = targets[mode];
+    const from = camera.position.clone();
+    const to = t.clone().add(new THREE.Vector3(9.5, 6.5, 10.5));
+    const start = performance.now();
+    const dur = 700;
+    function step(now) {
+      const k = Math.min(1, (now - start)/dur);
+      const ease = 1 - Math.pow(1-k, 3);
+      camera.position.lerpVectors(from, to, ease);
+      controls.target.lerp(t, ease);
+      controls.update();
+      if (k < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  });
+}
+
+document.getElementById('chip-s1').addEventListener('click', () => { focusSentences('s1'); syncChips('s1'); });
+document.getElementById('chip-s2').addEventListener('click', () => { focusSentences('s2'); syncChips('s2'); });
+document.getElementById('chip-all').addEventListener('click', () => { focusSentences('all'); syncChips('all'); });
+function syncChips(mode) {
+  ['chip-s1','chip-s2','chip-all'].forEach(id => document.getElementById(id).classList.remove('active'));
+  document.getElementById(mode === 's1' ? 'chip-s1' : mode === 's2' ? 'chip-s2' : 'chip-all').classList.add('active');
+}
+
+/* ============================================================ 工具按钮 */
+function bindToggle(id, apply) {
+  const btn = document.getElementById(id);
+  btn.addEventListener('click', () => {
+    const on = !btn.classList.contains('on');
+    btn.classList.toggle('on', on);
+    apply(on);
+  });
+}
+bindToggle('tb-rotate', on => controls.autoRotate = on);
+bindToggle('tb-links', on => {
+  linkGroup.visible = on; travelerGroup.visible = on;
+});
+bindToggle('tb-plane', on => {
+  zPlane.visible = on; planeEdge.visible = on;
+});
+bindToggle('tb-proj', on => {
+  if (!on) clearProj();
+  else if (selectedTok) buildProj(posOf(selectedTok));
+});
+bindToggle('tb-stars', on => stars.visible = on);
+
+/* ============================================================ 动画循环 */
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  // 巡游粒子沿关系线滑动
+  travelers.forEach((g, i) => {
+    const { from, to } = g.userData;
+    const speed = 0.35 + (i % 3) * 0.12;
+    const k = (t * speed) % 1;
+    g.position.lerpVectors(from, to, k);
+  });
+
+  controls.update();
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+}
+animate();
+
+/* 画布/标签尺寸跟随窗口 */
+window.addEventListener('resize', () => {
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w/h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  labelRenderer.setSize(w, h);
+});
+
+// 初始视角：等镜头就位后打开自动旋转（已在 controls 里开启）
+syncChips('all');
+</script>
+</body>
+</html>
