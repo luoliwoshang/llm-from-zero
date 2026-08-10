@@ -19,23 +19,23 @@ DEFAULT_SAMPLES = (
 )
 
 
-def visible_text(raw: bytes) -> str:
-    """Render token bytes while making incomplete UTF-8 visible."""
-    decoded = raw.decode("utf-8", errors="replace")
-    return repr(decoded)
+def visible_piece(raw: bytes) -> str:
+    """Render a token as text, or as bytes when it is incomplete UTF-8."""
+    try:
+        return repr(raw.decode("utf-8"))
+    except UnicodeDecodeError:
+        return f"<bytes {raw.hex(' ')}>"
 
 
-def print_baselines(text: str, details: bool) -> None:
+def print_baselines(text: str) -> None:
     byte_tokens = list(text.encode("utf-8"))
     rune_tokens = list(text)
 
     print(f"  {'UTF-8 bytes':<12} {len(byte_tokens):>3} tokens")
-    if details:
-        print("    " + " | ".join(f"0x{value:02x}" for value in byte_tokens))
+    print("    split: " + " | ".join(f"0x{value:02x}" for value in byte_tokens))
 
     print(f"  {'Unicode chars':<12} {len(rune_tokens):>3} tokens")
-    if details:
-        print("    " + " | ".join(repr(char) for char in rune_tokens))
+    print("    split: " + " | ".join(repr(char) for char in rune_tokens))
 
 
 def print_bpe(
@@ -45,25 +45,26 @@ def print_bpe(
 ) -> None:
     encoding = tiktoken.get_encoding(encoding_name)
     token_ids = encoding.encode(text)
+    token_bytes = [encoding.decode_single_token_bytes(token_id) for token_id in token_ids]
 
     assert encoding.decode(token_ids) == text
     print(f"  {encoding_name:<12} {len(token_ids):>3} tokens")
+    print("    split: " + " | ".join(visible_piece(raw) for raw in token_bytes))
 
     if not details:
         return
 
-    for index, token_id in enumerate(token_ids):
-        raw = encoding.decode_single_token_bytes(token_id)
+    for index, (token_id, raw) in enumerate(zip(token_ids, token_bytes, strict=True)):
         print(
             f"    #{index:<2} id={token_id:<7} "
-            f"text={visible_text(raw):<14} bytes={raw.hex(' ')}"
+            f"text={visible_piece(raw):<20} bytes={raw.hex(' ')}"
         )
 
 
 def compare(texts: Iterable[str], details: bool) -> None:
     for text in texts:
         print(f"\nInput: {text!r}")
-        print_baselines(text, details)
+        print_baselines(text)
         for encoding_name in ENCODING_NAMES:
             print_bpe(text, encoding_name, details)
 
@@ -80,7 +81,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--details",
         action="store_true",
-        help="Show every token ID, decoded piece, and byte sequence.",
+        help="Also show every token ID and its byte sequence.",
     )
     return parser.parse_args()
 
