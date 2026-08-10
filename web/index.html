@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="LLM From Zero 学习知识图谱" />
+    <title>LLM From Zero · Learning Graph</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section id="graph" class="graph-stage" aria-label="LLM 学习知识图谱"></section>
+
+      <header class="masthead">
+        <div class="eyebrow">LLM FROM ZERO <span>·</span> LEARNING GRAPH</div>
+        <h1>知识正在长出分支。</h1>
+        <p>每一次追问都保留成一条可回看的路径。</p>
+      </header>
+
+      <section class="control-rail" aria-label="图谱控制">
+        <label class="search-field">
+          <span class="sr-only">搜索知识节点</span>
+          <input id="search" type="search" placeholder="搜索节点、标签或摘要" autocomplete="off" />
+          <span class="search-key">/</span>
+        </label>
+        <div class="filter-row">
+          <label>
+            <span>类型</span>
+            <select id="type-filter">
+              <option value="all">全部</option>
+              <option value="chapter">章节</option>
+              <option value="concept">概念</option>
+              <option value="question">问题</option>
+              <option value="experiment">实验</option>
+            </select>
+          </label>
+          <label>
+            <span>状态</span>
+            <select id="status-filter">
+              <option value="all">全部</option>
+              <option value="learning">学习中</option>
+              <option value="understood">已理解</option>
+              <option value="planned">待学习</option>
+            </select>
+          </label>
+        </div>
+        <button id="fit-graph" class="text-button" type="button">重新聚焦图谱</button>
+      </section>
+
+      <section class="timeline" aria-label="学习时间轴">
+        <div class="timeline-head">
+          <span>学习进度回放</span>
+          <output id="timeline-date" for="timeline-range">全部节点</output>
+        </div>
+        <input id="timeline-range" type="range" min="0" max="0" value="0" step="1" aria-label="按时间查看知识节点" />
+        <div class="timeline-foot"><span id="visible-count">0 个节点</span><span id="updated-at"></span></div>
+      </section>
+
+      <aside id="detail" class="detail-panel" aria-live="polite" aria-label="节点详情">
+        <button id="close-detail" class="close-button" type="button" aria-label="关闭节点详情">×</button>
+        <div class="detail-empty">点击一个节点<br />查看它从哪里来。</div>
+        <div class="detail-content" hidden>
+          <div id="detail-type" class="detail-type"></div>
+          <h2 id="detail-title"></h2>
+          <p id="detail-summary"></p>
+          <dl>
+            <div><dt>录入时间</dt><dd id="detail-created"></dd></div>
+            <div><dt>状态</dt><dd id="detail-status"></dd></div>
+            <div><dt>所属课程</dt><dd id="detail-lesson"></dd></div>
+          </dl>
+          <div id="detail-tags" class="tag-line"></div>
+        </div>
+      </aside>
+
+      <div class="legend" aria-label="节点类型图例">
+        <span><i data-kind="chapter"></i>章节</span>
+        <span><i data-kind="concept"></i>概念</span>
+        <span><i data-kind="question"></i>问题</span>
+        <span><i data-kind="experiment"></i>实验</span>
+      </div>
+
+      <div id="loading" class="loading-state">正在载入学习图谱…</div>
+      <div id="error" class="error-state" hidden>暂时无法读取学习数据。</div>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.79.0/dist/3d-force-graph.min.js"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

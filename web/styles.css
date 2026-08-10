@@ -1,0 +1,79 @@
+:root {
+  --ink: #edf1e9;
+  --ink-dim: #a4afa0;
+  --ink-faint: #6f7b70;
+  --canvas: #0d1210;
+  --surface: rgba(17, 24, 20, 0.86);
+  --surface-edge: rgba(224, 235, 219, 0.14);
+  --accent: #e6ae5b;
+  --teal: #71c4ad;
+  --coral: #f1846b;
+  --blue: #86a9df;
+  --violet: #b697d3;
+  --mono: "DM Mono", ui-monospace, monospace;
+  --sans: "Manrope", "PingFang SC", "Hiragino Sans GB", sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--canvas); }
+body { color: var(--ink); font-family: var(--sans); }
+button, input, select { font: inherit; }
+button, select { color: inherit; }
+.app-shell { position: relative; width: 100%; height: 100%; overflow: hidden; background: radial-gradient(circle at 55% 46%, rgba(81, 123, 99, .11), transparent 36%), var(--canvas); }
+.graph-stage { position: absolute; inset: 0; }
+.graph-stage canvas { display: block; }
+.masthead { position: absolute; top: 28px; left: 34px; z-index: 3; pointer-events: none; }
+.eyebrow { color: var(--accent); font: 500 11px/1.4 var(--mono); letter-spacing: .16em; }
+.eyebrow span { color: var(--ink-faint); }
+h1 { max-width: 430px; margin: 12px 0 6px; font-size: clamp(26px, 3vw, 42px); line-height: 1.08; letter-spacing: 0; font-weight: 600; }
+.masthead p { margin: 0; color: var(--ink-dim); font-size: 14px; }
+.control-rail, .detail-panel { position: absolute; z-index: 4; background: var(--surface); border: 1px solid var(--surface-edge); box-shadow: 0 22px 60px rgba(0,0,0,.26); backdrop-filter: blur(18px); }
+.control-rail { top: 28px; right: 30px; width: min(330px, calc(100vw - 60px)); padding: 12px; }
+.search-field { position: relative; display: block; }
+.search-field input { width: 100%; height: 38px; padding: 0 34px 0 12px; border: 1px solid var(--surface-edge); outline: none; color: var(--ink); background: rgba(255,255,255,.045); }
+.search-field input:focus { border-color: var(--teal); box-shadow: 0 0 0 2px rgba(113,196,173,.16); }
+.search-field input::placeholder { color: var(--ink-faint); }
+.search-key { position: absolute; right: 12px; top: 9px; color: var(--ink-faint); font: 12px var(--mono); }
+.filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.filter-row label { color: var(--ink-faint); font: 11px var(--mono); }
+.filter-row select { display: block; width: 100%; margin-top: 5px; padding: 7px 8px; border: 1px solid var(--surface-edge); border-radius: 0; outline: none; color: var(--ink); background: rgba(255,255,255,.045); }
+.text-button { width: 100%; margin-top: 10px; padding: 7px 8px; border: 0; border-top: 1px solid var(--surface-edge); background: transparent; color: var(--accent); cursor: pointer; text-align: left; font-size: 12px; }
+.text-button:hover { color: var(--ink); }
+.timeline { position: absolute; z-index: 3; bottom: 25px; left: 34px; width: min(430px, calc(100vw - 68px)); color: var(--ink-dim); }
+.timeline-head, .timeline-foot { display: flex; justify-content: space-between; gap: 12px; font: 11px var(--mono); }
+.timeline-head { margin-bottom: 8px; color: var(--ink); }
+.timeline-foot { margin-top: 5px; color: var(--ink-faint); }
+#timeline-range { display: block; width: 100%; accent-color: var(--accent); cursor: pointer; }
+.detail-panel { top: 176px; right: 30px; width: min(330px, calc(100vw - 60px)); min-height: 180px; padding: 20px; transform: translateX(calc(100% + 40px)); transition: transform .24s ease; }
+.detail-panel.open { transform: translateX(0); }
+.close-button { position: absolute; top: 8px; right: 10px; border: 0; background: transparent; color: var(--ink-faint); cursor: pointer; font-size: 20px; line-height: 1; }
+.close-button:hover { color: var(--ink); }
+.detail-empty { padding-top: 28px; color: var(--ink-faint); font: 13px/1.8 var(--mono); }
+.detail-type { color: var(--accent); font: 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+.detail-content h2 { margin: 9px 0 8px; font-size: 23px; font-weight: 600; line-height: 1.2; }
+.detail-content p { margin: 0 0 16px; color: var(--ink-dim); font-size: 13px; line-height: 1.7; }
+dl { margin: 0; border-top: 1px solid var(--surface-edge); }
+dl div { display: grid; grid-template-columns: 76px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--surface-edge); }
+dt { color: var(--ink-faint); font: 10px var(--mono); } dd { margin: 0; color: var(--ink); font-size: 11px; word-break: break-word; }
+.tag-line { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 13px; color: var(--teal); font: 10px var(--mono); }
+.tag-line span { padding: 3px 6px; border: 1px solid rgba(113,196,173,.32); }
+.legend { position: absolute; right: 32px; bottom: 29px; z-index: 3; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 13px; color: var(--ink-dim); font: 10px var(--mono); }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); }
+.legend i[data-kind="chapter"] { background: var(--accent); }
+.legend i[data-kind="concept"] { background: var(--teal); }
+.legend i[data-kind="question"] { background: var(--coral); }
+.legend i[data-kind="experiment"] { background: var(--blue); }
+.loading-state, .error-state { position: absolute; inset: 50% auto auto 50%; z-index: 5; transform: translate(-50%, -50%); color: var(--ink-dim); font: 12px var(--mono); }
+.error-state { color: var(--coral); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+@media (max-width: 720px) {
+  .masthead { top: 18px; left: 18px; right: 18px; }
+  .masthead p { font-size: 12px; }
+  h1 { font-size: 28px; }
+  .control-rail { top: 112px; left: 18px; right: 18px; width: auto; }
+  .detail-panel { top: auto; right: 18px; bottom: 92px; width: calc(100vw - 36px); transform: translateY(calc(100% + 180px)); }
+  .detail-panel.open { transform: translateY(0); }
+  .timeline { left: 18px; bottom: 22px; width: calc(100vw - 36px); }
+  .legend { right: 18px; bottom: 75px; max-width: 220px; }
+}

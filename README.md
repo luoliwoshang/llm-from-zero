@@ -115,11 +115,22 @@ logits
 
 建议使用 Python 3.11 或 3.12。具体环境文件和安装命令会在第一课加入，避免在真正需要之前引入大量依赖。
 
+## 学习图谱
+
+仓库提供一个只读的 3D 学习图谱页面：
+
+<https://luoliwoshang.github.io/llm-from-zero/>
+
+页面从 [`web/learning-graph.json`](web/learning-graph.json) 读取节点和父子关系。教学过程中触达新的独立知识点或问题分支时，按照 [`AGENTS.md`](AGENTS.md) 的规则更新 JSON 并通过 Git 提交；[`process.md`](process.md) 继续记录当前教学状态和最新进展。
+
 ## 目录规划
 
 ```text
 .
 ├── README.md
+├── AGENTS.md
+├── process.md
+├── web/                  # GitHub Pages 的只读 3D 学习图谱
 ├── lessons/             # 每课的讲解、实验和练习
 │   ├── 01-tokenizer/
 │   ├── 02-sampling/
